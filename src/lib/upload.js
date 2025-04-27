@@ -1,30 +1,22 @@
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { storage } from "./firebase";
+import { supabase } from "./supabaseClient";
 
 const upload = async (file) => {
-  const date = new Date();
-  const storageRef = ref(storage, `images/${date + file.name}`);
+  // Use a unique file path, e.g. images/timestamp_filename
+  const filePath = `images/${Date.now()}_${file.name}`;
+  const { data, error } = await supabase.storage
+    .from('chat-files') // Make sure this bucket exists in your Supabase project
+    .upload(filePath, file);
 
-  const uploadTask = uploadBytesResumable(storageRef, file);
+  if (error) {
+    throw new Error("Something went wrong! " + error.message);
+  }
 
-  return new Promise((resolve, reject) => {
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const progress =
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        console.log("Upload is " + progress + "% done");
-      },
-      (error) => {
-        reject("Something went wrong!" + error.code);
-      },
-      () => {
-        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-          resolve(downloadURL);
-        });
-      }
-    );
-  });
+  // Get public URL
+  const { data: publicUrlData } = supabase.storage
+    .from('chat-files')
+    .getPublicUrl(filePath);
+
+  return publicUrlData.publicUrl;
 };
 
 export default upload;
